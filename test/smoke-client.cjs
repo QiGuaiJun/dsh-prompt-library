@@ -194,7 +194,7 @@ check('面板默认关闭不渲染内容', node === null, JSON.stringify(node))
 storage.set('dsh:prompt-library:v1', JSON.stringify({
   version: 1,
   prompts: [
-    { id: 'p1', title: '地铁跑酷网页游戏', content: '创建一个可直接玩的地铁跑酷网页游戏…', tags: ['前端'], note: '', source: '用户提示词', starred: false, pinned: false, createdAt: '2026-11-20T00:00:00.000Z', updatedAt: '2026-11-20T00:00:00.000Z' },
+    { id: 'p1', title: '地铁跑酷网页游戏', content: '创建一个可直接玩的地铁跑酷网页游戏…', tags: ['前端'], note: '想做小游戏练手时用', source: '用户提示词', starred: false, pinned: false, createdAt: '2026-11-20T00:00:00.000Z', updatedAt: '2026-11-20T00:00:00.000Z' },
     { id: 'p2', title: 'AIHOT 动效', content: '为网站 AIHOT 制作一支顶级水准的动效宣传视频…', tags: ['视频'], note: '', source: '手动新建', starred: false, pinned: true, createdAt: '2026-11-19T00:00:00.000Z', updatedAt: '2026-11-19T00:00:00.000Z' },
   ],
 }))
@@ -226,6 +226,7 @@ check('有标签 chips：全部', body.indexOf('全部') >= 0)
 check('渲染出 2 张卡片', find(node, (n) => n.props && n.props.className === 'pcl-card').length === 2,
   'got ' + find(node, (n) => n.props && n.props.className === 'pcl-card').length)
 check('卡片含标题', body.indexOf('地铁跑酷网页游戏') >= 0)
+check('卡片显示「什么时候用」', body.indexOf('想做小游戏练手时用') >= 0)
 check('置顶条目带图钉', body.indexOf('📌') >= 0)
 
 console.log('')

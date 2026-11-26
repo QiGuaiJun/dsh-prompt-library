@@ -250,12 +250,18 @@ const ta = find(node, (n) => n.tag === 'textarea')[0]
 check('编辑框有正文', !!ta)
 ta.props.onChange({ target: { value: '改过的正文内容 ABC' } })
 node = draw()
+const noteInput = find(node, (n) => n.tag === 'input' && typeof n.props.placeholder === 'string'
+  && n.props.placeholder.indexOf('先对齐再出方案') >= 0)[0]
+check('编辑框有「什么时候用」输入项', !!noteInput)
+if (noteInput) noteInput.props.onChange({ target: { value: '方向模糊时先对齐目标' } })
+node = draw()
 byText(node, '保存').props.onClick()
 node = draw()
 const saved = JSON.parse(storage.get('dsh:prompt-library:v1'))
 const p2 = saved.prompts.find((p) => p.id === 'p2')
 check('保存后正文已更新', p2 && p2.content === '改过的正文内容 ABC', p2 && p2.content)
 check('保存后置顶状态保留', p2 && p2.pinned === true, String(p2 && p2.pinned))
+check('保存后「什么时候用」已落库', p2 && p2.note === '方向模糊时先对齐目标', p2 && p2.note)
 
 /* ---- 返回列表 ---- */
 find(node, (n) => n.props && n.props.className === 'pcl-back')[0].props.onClick()

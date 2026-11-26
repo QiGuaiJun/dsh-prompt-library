@@ -298,7 +298,9 @@ node.data.finalNode.messageId
 | 详情页「填入对话」 | 取 `content` 调 `setDraft(content)`，toast「已填入对话」，面板自动关闭 |
 | 详情页「复制」 | `navigator.clipboard.writeText(content)`；失败则 `execCommand('copy')` 兜底；再失败 toast「复制失败，请手动选择正文」 |
 | 无可用输入框 | toast「当前没有可用的对话输入框，请先打开一个会话」，不静默失败 |
-| 新建 | 打开 EditDialog，正文为空、需用户填 |
+| 新建 | 打开 EditDialog，正文为空、需用户填；**建议顺手填「什么时候用」** |
+| 编辑 | EditDialog 可改 标题 / 正文 / 标签 / **什么时候用** / 来源 / 星标；`note` 经 `upsertPrompt` 写成 `(draft.note \|\| '').trim()` |
+| 「什么时候用」为什么是必填建议 | 它是引导功能的**语义索引**：`guideLine()` 把它拼进元提示词的收藏目录，AI 靠它判断该不该选这条。**缺了它，该条目在引导里只剩标题和标签**。列表卡片也会显示这一行（`.pcl-card-note`，accent 色、2 行截断）；详情页小节名从「备注」改为「什么时候用」 |
 | 消息下「存为提示词」 | 打开 EditDialog，`content` 预填该消息正文，`source` 预填「用户提示词」/「助手回复」 |
 | 标题留空 | 保存时用 `deriveTitle(content)` 兜底 |
 | 标签输入 | `splitTags()`：按 `,` `，` `\n` `\r` 切分 → trim → 去重 → 每条限 40 字 → 最多 24 条 |
@@ -400,14 +402,14 @@ node test/smoke-theme-poll.cjs  # 明暗跟随（服务晚就绪）
 
 | 脚本 | 覆盖 | 结果 |
 |---|---|---|
-| `test/smoke-client.cjs` | 槽位注册契约 + 列表页渲染（搜索框/下拉/chips/卡片/图钉/刷新按钮） | 28 项通过 |
-| `test/smoke-detail.cjs` | 详情页 + 复制 + 填入对话 + 编辑保存 + 新建 + 刷新 + 标签筛选 + 搜索 + **导入（粘贴/选文件/坏数据）** | 49 项通过 |
+| `test/smoke-client.cjs` | 槽位注册契约 + 列表页渲染（搜索框/下拉/chips/卡片/图钉/刷新按钮/「什么时候用」行） | 29 项通过 |
+| `test/smoke-detail.cjs` | 详情页 + 复制 + 填入对话 + 编辑保存（含「什么时候用」落库）+ 新建 + 刷新 + 标签筛选 + 搜索 + **导入（粘贴/选文件/坏数据）** | 51 项通过 |
 | `test/smoke-asst.cjs` | 助手消息正文提取（text 块拼接、跳过 reasoning、异常降级） | 7 项通过 |
 | `test/smoke-theme.cjs` | `theme` 服务已就绪时：订阅 `theme/change`、亮/暗切换驱动 `pcl-light`、服务缺失/抛异常都不崩 | 9 项通过 |
 | `test/smoke-theme-poll.cjs` | `theme` **晚就绪**：先轮询、就绪后接上并停轮询、永不就绪时 8s 后放弃且槽位仍全注册 | 12 项通过 |
 | `test/smoke-guide.cjs` | 「说不清要什么」引导：入口文案与位置、输入框为空不弹确认、一键填入、6 条规则关键句齐全、带收藏标题/`note`/标签、**不塞正文**、允许 AI 改写、别硬凑、填入后关面板、已有内容时弹确认（取消不覆盖/确认才写）、空收藏也能生成 | 28 项通过 |
 
-合计 **133 项，失败 0**。
+合计 **136 项，失败 0**。
 
 **在线槽位核实**（`cordis_inspect_query` 读运行中 GUI 的真实槽位树，全部 `active: true`）
 
@@ -428,15 +430,17 @@ node test/smoke-theme-poll.cjs  # 明暗跟随（服务晚就绪）
 | `conversation.chat.user.before` | `{ name, select(owner) }`（chain 槽，无 id） |
 | `conversation.chat.assistant-actions` | `{ name, id:'dsh-prompt-library-save-assistant', order:20 }` |
 
-**列表页 28 项**（`test/smoke-client.cjs`）：模块注册、`inject` 含 `slots`、5 个槽位注册契约逐条比对
+**列表页 29 项**（`test/smoke-client.cjs`）：模块注册、`inject` 含 `slots`、5 个槽位注册契约逐条比对
 （`conversation.input.left` 带 `id+order`、`shell.overlay` 带 `id+order`、`input.right` 带 `id`、
 `user.before` 只有 `select` 且**不带 id**、`assistant-actions` 带 `id+order`）、
 chain `select` 命中返 `{text}` / 空文本返 `null`、面板默认关闭不渲染、
-点入口按钮后渲染出标题/搜索框/下拉/新建/刷新/chips/卡片、置顶条目带 📌 且排最前。
+点入口按钮后渲染出标题/搜索框/下拉/新建/刷新/chips/卡片、
+卡片显示「什么时候用」那一行、置顶条目带 📌 且排最前。
 
-**详情页 49 项**（`test/smoke-detail.cjs`）：进入详情页显示标题与 6 个操作按钮、
+**详情页 51 项**（`test/smoke-detail.cjs`）：进入详情页显示标题与 6 个操作按钮、
 「复制」写入剪贴板、「填入对话」调用 `setDraft` 且面板自动关闭、
-「编辑」改正文后正确落库且保留 `pinned`、「返回」回到列表、
+「编辑」改正文后正确落库且保留 `pinned`、「编辑」框里有「什么时候用」输入项且保存后落到 `note`、
+「返回」回到列表、
 「新建」填标题+正文后落库且标题正确、
 外部改 `localStorage` 后未点「刷新」仍显示旧数据、点「刷新」后读到新条目并 toast「已刷新」、
 标签下拉与 chips 行为一致（都只剩 1 张）、搜索命中标题、
