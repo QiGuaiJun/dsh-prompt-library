@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Prompt library",
+    "description": "Save the prompts you keep retyping and drop them back into the composer.",
+    "detail": "docs/DETAIL.md"
+  }
+}

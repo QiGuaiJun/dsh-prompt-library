@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Prompt library">
+  <defs>
+    <linearGradient id="dpl-sheet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5b8def"/>
+      <stop offset="1" stop-color="#2f6ae0"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="8" width="52" height="48" rx="12" fill="url(#dpl-sheet)"/>
+  <g fill="#ffffff" opacity="0.95">
+    <rect x="16" y="19" width="26" height="3.6" rx="1.8"/>
+    <rect x="16" y="28" width="32" height="3.6" rx="1.8"/>
+    <rect x="16" y="37" width="20" height="3.6" rx="1.8"/>
+  </g>
+  <path d="M44 34.5l2.6 5.8 5.8 2.6-5.8 2.6L44 51.3l-2.6-5.8-5.8-2.6 5.8-2.6z" fill="#ffd76a"/>
+</svg>
