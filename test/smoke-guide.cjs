@@ -220,6 +220,10 @@ check('入口文案说「让库里挑一条」', texts(guideBtn || node).indexOf
 const rowOrder = find(node, (n) => n.props && (n.props.className === 'pcl-guidebar' || n.props.className === 'pcl-searchrow'))
 check('入口排在搜索行之前', rowOrder.length === 2 && rowOrder[0].props.className === 'pcl-guidebar',
   rowOrder.map((r) => r.props.className).join(','))
+const hintNode = byClass(node, 'pcl-guide-hint')[0]
+check('入口下面写清点完会发生什么', !!hintNode && texts(hintNode).indexOf('按回车发送') >= 0,
+  texts(hintNode || '').slice(0, 80))
+check('入口下面说明三种情况', !!hintNode && texts(hintNode).indexOf('拿不准就列几条') >= 0)
 
 /* ---- A 分支：对话里明确提到「目标/需求」，应直接挑出「对齐目标」并给出正文 ---- */
 liveDraft = ''
@@ -238,10 +242,12 @@ check('输入框为空时不弹确认', confirmCalls.length === 0, JSON.stringif
 check('点一下就写进输入框', !!draft, String(draft).slice(0, 40))
 check('强匹配时直接给出该条正文', !!draft && draft.indexOf('先用一句话复述我的目标') >= 0,
   '未带正文；开头是：' + String(draft).slice(0, 120))
-check('正文前有小标题标明是我挑的那条', !!draft && draft.indexOf('【我挑的这条】') >= 0)
-check('给出了挑选理由（什么时候用）', !!draft && draft.indexOf('需求模糊、方向没定的时候用') >= 0)
-check('开头说的是「已经挑好了」', !!draft && draft.indexOf('我已经挑好了一条') < 0 && draft.indexOf('挑好了一条') >= 0,
+check('强匹配时开头只说「用下面这条」', !!draft && draft.indexOf('用下面这条，直接做') >= 0,
   String(draft).slice(0, 60))
+check('强匹配时不注水：不含挑选理由/请你这样做等段落', !!draft &&
+  draft.indexOf('【请你这样做】') < 0 && draft.indexOf('需求模糊、方向没定的时候用') < 0,
+  String(draft).slice(0, 120))
+check('强匹配时全文不超过 120 字', !!draft && draft.length <= 120, '实际 ' + String(draft).length + ' 字')
 node = draw()
 const toastNode = find(node, (n) => n.props && String(n.props.className || '').indexOf('pcl-toast') >= 0)[0]
 const toastText = texts(toastNode || '')
@@ -253,14 +259,13 @@ check('toast 里点名挑中的标题', toastText.indexOf('对齐目标') >= 0, 
 check('填入后面板关闭', String((toastNode || {}).props ? toastNode.props.className : '').indexOf('pcl-toast-float') >= 0,
   String((toastNode || {}).props ? toastNode.props.className : 'no toast'))
 
-/* ---- 带上最近对话 ---- */
-check('带上最近对话的小标题', !!draft && draft.indexOf('【我们前面已经聊到的】') >= 0)
-check('带上用户说过的话', !!draft && draft.indexOf('我想给公司做一个内部工具') >= 0)
-check('带上 AI 说过的话', !!draft && draft.indexOf('你希望先解决哪类人的问题') >= 0)
-check('对话标注了角色', !!draft && draft.indexOf('我：') >= 0 && draft.indexOf('AI：') >= 0)
-check('对话段在此之前', !!draft && draft.indexOf('【我们前面已经聊到的】') < draft.indexOf('【我挑的这条】'))
+/* ---- 不再抄对话原文：对话内容模型本来就看得到，抄过去纯占字数 ---- */
+check('不再把对话原文抄进输入框', !!draft && draft.indexOf('我想给公司做一个内部工具') < 0,
+  String(draft).slice(0, 160))
+check('不再有「我们前面已经聊到的」大段', !!draft && draft.indexOf('【我们前面已经聊到的】') < 0)
+check('不再有角色标注的对话行', !!draft && draft.indexOf('AI：你希望先解决哪类人的问题') < 0)
 
-/* ---- 带上输入框里写了一半的草稿 ---- */
+/* ---- 带上输入框里写了一半的草稿（这个模型真的看不到） ---- */
 liveNodes = []
 liveDraft = '我想做一个给运营用的日报名单工具，但还没想清楚要不要做审批流'
 draft = null
@@ -269,8 +274,7 @@ openPanel()
 node = draw()
 clickGuide(node)
 check('带回输入框里写了一半的内容', !!draft && draft.indexOf('日报名单工具') >= 0, String(draft).slice(0, 120))
-check('草稿段有小标题', !!draft && draft.indexOf('【我刚在输入框里写了一半的】') >= 0)
-check('告诉 AI 不要当没看见', !!draft && draft.indexOf('不要当没看见') >= 0)
+check('草稿说明模型之前没看到过', !!draft && draft.indexOf('你之前没看到') >= 0)
 
 /* ---- B 分支：有相关词但不够强 → 只列候选，不塞正文 ---- */
 liveNodes = [
@@ -283,12 +287,13 @@ hookStore.clear()
 openPanel()
 node = draw()
 clickGuide(node)
-check('弱匹配时列出候选', !!draft && draft.indexOf('【我收藏里看起来可能相关的】') >= 0,
+check('弱匹配时列出候选', !!draft && draft.indexOf('从下面这几条里挑一条') >= 0,
   String(draft).slice(0, 120))
 check('弱匹配时带上候选标题', !!draft && draft.indexOf('专家会诊') >= 0)
 check('弱匹配时不直接塞正文', !!draft && draft.indexOf('组 3 个互补的专家视角互相质疑') < 0)
-check('弱匹配时要求只挑 1 条', !!draft && draft.indexOf('只挑 1 条') >= 0)
-check('弱匹配时允许说不合适', !!draft && draft.indexOf('都不合适就明说') >= 0)
+check('弱匹配时要求挑完直接做', !!draft && draft.indexOf('直接用它帮我把这件事做出来') >= 0)
+check('弱匹配时允许说不合适', !!draft && draft.indexOf('都不太对就说一声') >= 0)
+check('弱匹配时全文不超过 320 字', !!draft && draft.length <= 320, '实际 ' + String(draft).length + ' 字')
 
 /* ---- B 分支：完全没命中 → 列候选但也允许"没有明显相关" ---- */
 liveNodes = []
@@ -299,7 +304,7 @@ openPanel()
 node = draw()
 clickGuide(node)
 check('没命中词时不崩，仍给出可发送内容', !!draft && draft.length > 40, String(draft).slice(0, 60))
-check('没命中词时提示可能得补一条', !!draft && draft.indexOf('没有明显相关的') >= 0,
+check('没命中词时提示这批对不上', !!draft && draft.indexOf('这批都对不上') >= 0,
   String(draft).slice(0, 160))
 
 /* ---- C 分支：空库 → 退回追问流程 ---- */
@@ -341,7 +346,7 @@ check('取消后面板仍开着', byClass(node, 'pcl-root').length === 1)
 confirmAnswer = true
 confirmCalls = []
 byClass(node, 'pcl-guide-btn')[0].props.onClick()
-check('确认后写入输入框', !!draft && draft.indexOf('【我挑的这条】') >= 0, String(draft).slice(0, 60))
+check('确认后写入输入框', !!draft && draft.indexOf('用下面这条') >= 0, String(draft).slice(0, 60))
 node = draw()
 const toast2 = find(node, (n) => n.props && String(n.props.className || '').indexOf('pcl-toast-float') >= 0)[0]
 check('确认填入后面板关闭', !!toast2, toast2 ? 'ok' : String(node && node.tag))
@@ -358,7 +363,7 @@ hookStore.clear()
 openPanel()
 node = draw()
 clickGuide(node)
-check('并列时不硬点一条（走候选分支）', !!draft && draft.indexOf('【我挑的这条】') < 0,
+check('并列时不硬点一条（走候选分支）', !!draft && draft.indexOf('用下面这条') < 0,
   String(draft).slice(0, 80))
 
 /* ---- 挑中判定：同一条命中两个不同字段、明显领先 → 算强匹配 ---- */
@@ -375,7 +380,7 @@ hookStore.clear()
 openPanel()
 node = draw()
 clickGuide(node)
-check('多字段命中且领先时算强匹配', !!draft && draft.indexOf('【我挑的这条】') >= 0,
+check('多字段命中且领先时算强匹配', !!draft && draft.indexOf('用下面这条') >= 0,
   String(draft).slice(0, 100))
 check('强匹配给出的是那条的正文', !!draft && draft.indexOf('把目标先复述一遍再动手') >= 0)
 
