@@ -157,13 +157,15 @@ const Overlay = byName['shell.overlay'].component
 const Trigger = byName['conversation.input.left'].component
 const Bridge = byName['conversation.input.right'].component
 
-/* 桥接：模拟真实会话域注入的 inputActions + useInput */
+/* 桥接：模拟真实会话域注入的 inputActions + useInput + useChat */
 let draft = null
 let liveDraft = ''
+let liveNodes = []
 function mountBridge() {
   render(React.createElement(Bridge, {
     inputActions: { setDraft: (v) => { draft = v; liveDraft = v } },
     useInput: (sel) => sel({ draft: liveDraft }),
+    useChat: (sel) => sel({ nodes: { values: () => liveNodes } }),
   }))
 }
 
@@ -248,6 +250,18 @@ check('点「确定」才写入输入框', !!draft && draft.indexOf('还很模�
 node = draw()
 check('确认填入后面板关闭', node === null)
 
+/* ---- 输入框里写了一半的需求也要带上（不丢用户已写的字） ---- */
+liveNodes = []
+liveDraft = '我想做一个给运营用的日报名单工具，但还没想清楚要不要做审批流'
+draft = null
+hookStore.clear()
+openPanel()
+node = draw()
+byClass(node, 'pcl-guide-btn')[0].props.onClick()
+check('带回输入框里写了一半的内容', !!draft && draft.indexOf('日报名单工具') >= 0, String(draft).slice(0, 120))
+check('草稿段有小标题', !!draft && draft.indexOf('【我刚在输入框里写了一半的】') >= 0)
+check('告诉 AI 不要当没看见', !!draft && draft.indexOf('不要当没看见') >= 0)
+
 /* ---- 空收藏也能用（跳过目录段） ---- */
 storage.set('dsh:prompt-library:v1', JSON.stringify({ version: 1, prompts: [] }))
 openPanel()
@@ -257,6 +271,39 @@ draft = null
 byClass(node, 'pcl-guide-btn')[0].props.onClick()
 check('空收藏时也能生成', !!draft && draft.indexOf('还很模糊的想法') >= 0)
 check('空收藏时说明跳过目录', draft && draft.indexOf('收藏还是空的') >= 0, String(draft).slice(-80))
+
+/* ---- 带上最近对话（用户要的「通过对话内容判断下一步」） ---- */
+liveNodes = [
+  { kind: 'user', data: { source: { text: '我想给公司做一个内部工具' } } },
+  { kind: 'assistant', data: { blocks: [{ kind: 'text', text: '你希望先解决哪类人的问题？' }] } },
+  { kind: 'user', data: { source: { text: '先解决运营同学每天手工导表的问题' } } },
+]
+storage.set('dsh:prompt-library:v1', JSON.stringify({
+  version: 1,
+  prompts: [{ id: 'g1', title: '对齐目标', content: 'C', tags: [], note: '方向模糊时用', source: '', starred: false, pinned: false, createdAt: '2026-11-20T00:00:00.000Z', updatedAt: '2026-11-20T00:00:00.000Z' }],
+}))
+liveDraft = ''
+draft = null
+openPanel()
+node = draw()
+byClass(node, 'pcl-guide-btn')[0].props.onClick()
+check('带上最近对话的小标题', !!draft && draft.indexOf('【我们前面已经聊到的】') >= 0, String(draft).slice(0, 80))
+check('带上用户说过的话', !!draft && draft.indexOf('先解决运营同学每天手工导表的问题') >= 0)
+check('带上 AI 说过的话', !!draft && draft.indexOf('你希望先解决哪类人的问题') >= 0)
+check('对话标注了角色', !!draft && draft.indexOf('我：') >= 0 && draft.indexOf('AI：') >= 0)
+check('要求跳过已明确的', !!draft && draft.indexOf('已经清楚的，直接跳过') >= 0)
+check('对话段在流程段之前', !!draft && draft.indexOf('【我们前面已经聊到的】') < draft.indexOf('【请你这样做】'),
+  'i1=' + (draft ? draft.indexOf('【我们前面已经聊到的】') : 'nul') + ' i2=' + (draft ? draft.indexOf('【请你这样做】') : 'nul'))
+
+/* 没有对话时不该冒出空标题 */
+liveNodes = []
+storage.set('dsh:prompt-library:v1', JSON.stringify({ version: 1, prompts: [] }))
+liveDraft = ''
+draft = null
+openPanel()
+node = draw()
+byClass(node, 'pcl-guide-btn')[0].props.onClick()
+check('没有对话时不出现对话段', !!draft && draft.indexOf('【我们前面已经聊到的】') < 0, String(draft).slice(0, 60))
 
 /* ---- 没有可用输入框时给出提示而不是静默 ---- */
 hookStore.clear()
