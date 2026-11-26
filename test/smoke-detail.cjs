@@ -232,9 +232,11 @@ check('复制写入剪贴板', clipboardValue && clipboardValue.indexOf('AIHOT')
 byText(node, '填入对话').props.onClick()
 check('填入对话调用 setDraft', draft && draft.indexOf('AIHOT') >= 0, String(draft).slice(0, 40))
 
-/* 面板应自动关闭 */
+/* 面板应自动关闭（关闭后仍会留一个悬空 toast，所以判「没有面板」而不是「节点为空」） */
 node = draw()
-check('填入后面板关闭', node === null)
+check('填入后面板关闭', find(node, (n) => n.props && String(n.props.className || '').indexOf('pcl-modal') >= 0).length === 0,
+  'still has modal')
+check('关闭后留下「已填入」提示', find(node, (n) => n.props && String(n.props.className || '').indexOf('pcl-toast') >= 0).length === 1)
 
 /* ---- 重新打开 → 编辑 ---- */
 openPanel()
