@@ -297,7 +297,10 @@ node.data.finalNode.messageId
 | 删除 | `window.confirm` 二次确认 |
 | 导出 | 生成 `prompt-library.json` 触发下载 |
 | 刷新 | 重新执行 `loadState()` 覆盖组件状态，toast「已刷新」；用于别的标签页改动后同步 |
-| 导入 | 读文件 → `safeParse` → 以 `id` 为键合并，同 id 覆盖 → 刷新列表 |
+| 导入 | 打开导入弹窗，两条等价入口：**选文件** 或 **直接粘贴 JSON**。两条路都走 `safeParse` → 以 `id` 为键合并，同 id 覆盖 → 刷新列表，并 toast「已导入 N 条」 |
+| 导入（选文件） | `pickJsonFile()`：`<input type=file>` **必须先挂进 `document.body` 再 `click()`**。游离节点在 Electron 下可能不弹框 / 不触发 `onchange`；读完立刻从 DOM 摘除 |
+| 导入（粘贴） | 不依赖文件对话框，桌面版选文件失灵时的兜底路径 |
+| 导入失败 | 非法 JSON 提示「这段内容不是合法的 JSON」；无可用条目提示「文件里没有可导入的提示词」；绝不静默吞掉 |
 
 ---
 
@@ -349,12 +352,12 @@ node test/smoke-theme-poll.cjs  # 明暗跟随（服务晚就绪）
 | 脚本 | 覆盖 | 结果 |
 |---|---|---|
 | `test/smoke-client.cjs` | 槽位注册契约 + 列表页渲染（搜索框/下拉/chips/卡片/图钉/刷新按钮） | 28 项通过 |
-| `test/smoke-detail.cjs` | 详情页 + 复制 + 填入对话 + 编辑保存 + 新建 + 刷新 + 标签筛选 + 搜索 | 34 项通过 |
+| `test/smoke-detail.cjs` | 详情页 + 复制 + 填入对话 + 编辑保存 + 新建 + 刷新 + 标签筛选 + 搜索 + **导入（粘贴/选文件/坏数据）** | 49 项通过 |
 | `test/smoke-asst.cjs` | 助手消息正文提取（text 块拼接、跳过 reasoning、异常降级） | 7 项通过 |
 | `test/smoke-theme.cjs` | `theme` 服务已就绪时：订阅 `theme/change`、亮/暗切换驱动 `pcl-light`、服务缺失/抛异常都不崩 | 9 项通过 |
 | `test/smoke-theme-poll.cjs` | `theme` **晚就绪**：先轮询、就绪后接上并停轮询、永不就绪时 8s 后放弃且槽位仍全注册 | 12 项通过 |
 
-合计 **90 项，失败 0**。
+合计 **105 项，失败 0**。
 
 **在线槽位核实**（`cordis_inspect_query` 读运行中 GUI 的真实槽位树，全部 `active: true`）
 
@@ -381,12 +384,15 @@ node test/smoke-theme-poll.cjs  # 明暗跟随（服务晚就绪）
 chain `select` 命中返 `{text}` / 空文本返 `null`、面板默认关闭不渲染、
 点入口按钮后渲染出标题/搜索框/下拉/新建/刷新/chips/卡片、置顶条目带 📌 且排最前。
 
-**详情页 34 项**（`test/smoke-detail.cjs`）：进入详情页显示标题与 6 个操作按钮、
+**详情页 49 项**（`test/smoke-detail.cjs`）：进入详情页显示标题与 6 个操作按钮、
 「复制」写入剪贴板、「填入对话」调用 `setDraft` 且面板自动关闭、
 「编辑」改正文后正确落库且保留 `pinned`、「返回」回到列表、
 「新建」填标题+正文后落库且标题正确、
 外部改 `localStorage` 后未点「刷新」仍显示旧数据、点「刷新」后读到新条目并 toast「已刷新」、
-标签下拉与 chips 行为一致（都只剩 1 张）、搜索命中标题。
+标签下拉与 chips 行为一致（都只剩 1 张）、搜索命中标题、
+**导入粘贴路径**（弹窗有选文件按钮与粘贴框、粘贴 2 条后卡片 +2 且真正落库、toast「已导入 2 条」）、
+**导入选文件路径**（点按钮时 file input 必须已挂进 `document.body`、读入后落库、读完从 DOM 摘除、弹窗自动关闭）、
+**导入坏数据**（非法 JSON 有明确提示且不写入任何数据）。
 
 **助手正文提取 7 项**（`test/smoke-asst.cjs`）：按 `messageId` 命中目标消息、
 拼接多个 `text` 块（空行连接）、跳过 `reasoning` 块、

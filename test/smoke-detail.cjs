@@ -115,10 +115,41 @@ Object.defineProperty(globalThis, 'navigator', {
   configurable: true,
   writable: true,
 })
-global.document = { createElement: () => ({ setAttribute() {}, appendChild() {}, style: {}, click() {} }), head: { appendChild() {} } }
+/* 记录型 DOM：file input 必须能"挂进 body 再 click"才符合修复后的实现 */
+let lastFileInput = null
+const bodyChildren = []
+global.document = {
+  createElement: (tag) => {
+    const el = {
+      tag, type: '', accept: '', files: null, onchange: null, parentNode: null,
+      style: {}, setAttribute() {}, appendChild() {},
+      click() { if (tag === 'input') lastFileInput = el },
+    }
+    return el
+  },
+  head: { appendChild() {} },
+  body: {
+    appendChild(el) { el.parentNode = global.document.body; bodyChildren.push(el) },
+    removeChild(el) {
+      const i = bodyChildren.indexOf(el)
+      if (i >= 0) bodyChildren.splice(i, 1)
+      el.parentNode = null
+    },
+  },
+}
 global.Blob = function () {}
 global.URL = { createObjectURL: () => 'blob:x', revokeObjectURL() {} }
-global.FileReader = function () {}
+/* 从 __text 同步回调，模拟浏览器 FileReader */
+global.FileReader = function () {
+  const self = this
+  self.result = null
+  self.onload = null
+  self.onerror = null
+  self.readAsText = function (file) {
+    self.result = file.__text
+    if (self.onload) self.onload()
+  }
+}
 global.setTimeout = () => 0
 
 let captured = null
@@ -304,6 +335,91 @@ search.props.onChange({ target: { value: '地铁' } })
 node = draw()
 const searched = find(node, (n) => n.props && n.props.className === 'pcl-card')
 check('搜索命中标题', searched.length === 1, 'got ' + searched.length)
+
+/* ---- 导入：粘贴路径（不依赖文件对话框） ---- */
+search.props.onChange({ target: { value: '' } })
+node = draw()
+/* 前面的 chip 测试留下了「前端」筛选，先清掉 */
+find(node, (n) => n.props && n.props.className === 'pcl-select')[0].props.onChange({ target: { value: '' } })
+node = draw()
+const beforeImport = find(node, (n) => n.props && n.props.className === 'pcl-card').length
+
+/* 弹窗内的按钮：按 dialog 作用域取，避免命中标题行的同名按钮 */
+function inDialog(n, label) {
+  const dlg = find(n, (x) => x.props && x.props.className === 'pcl-dialog')[0]
+  if (!dlg) return null
+  return find(dlg, (x) => x.props && typeof x.props.className === 'string' &&
+    x.props.className.indexOf('pcl-btn') === 0 && texts(x) === label)[0]
+}
+
+byText(node, '导入').props.onClick()
+node = draw()
+const importDialog = find(node, (n) => n.props && n.props.className === 'pcl-dialog')[0]
+check('点导入弹出导入弹窗', !!importDialog)
+check('导入弹窗有选文件按钮', texts(importDialog).indexOf('选择 JSON 文件') >= 0, texts(importDialog).slice(0, 120))
+check('导入弹窗有粘贴框', find(importDialog, (n) => n.tag === 'textarea').length === 1)
+
+const pasteArea = find(importDialog, (n) => n.tag === 'textarea')[0]
+pasteArea.props.onChange({
+  target: {
+    value: JSON.stringify({
+      version: 1,
+      prompts: [
+        { id: 'imp1', title: '粘贴导入一', content: '粘贴进来的正文一', tags: ['导入'] },
+        { id: 'imp2', title: '粘贴导入二', content: '粘贴进来的正文二', tags: ['导入'] },
+      ],
+    }),
+  },
+})
+node = draw()
+inDialog(node, '导入').props.onClick()
+node = draw()
+check('粘贴导入后卡片数 +2',
+  find(node, (n) => n.props && n.props.className === 'pcl-card').length === beforeImport + 2,
+  'before=' + beforeImport + ' after=' + find(node, (n) => n.props && n.props.className === 'pcl-card').length)
+check('粘贴导入后有提示', texts(node).indexOf('已导入 2 条') >= 0, texts(node).slice(0, 120))
+const stored1 = JSON.parse(storage.get('dsh:prompt-library:v1'))
+check('粘贴导入真正写进 localStorage', stored1.prompts.some((p) => p.id === 'imp1'), JSON.stringify(stored1.prompts.map((p) => p.id)))
+
+/* ---- 导入：选文件路径（input 挂进 body 后才 click） ---- */
+check('导入弹窗已关闭', find(node, (n) => n.props && n.props.className === 'pcl-dialog').length === 0)
+byText(node, '导入').props.onClick()
+node = draw()
+/* 校验修复点：选文件按钮点击后，input 必须已挂到 body 上 */
+bodyChildren.length = 0
+lastFileInput = null
+const pickBtn = find(node, (n) => n.props && n.props.className === 'pcl-btn' && texts(n) === '选择 JSON 文件…')[0]
+check('导入弹窗有「选择 JSON 文件…」按钮', !!pickBtn)
+pickBtn.props.onClick()
+check('文件 input 已挂进 DOM 再 click', !!lastFileInput && lastFileInput.parentNode === global.document.body,
+  'input=' + !!lastFileInput + ' parent=' + !!(lastFileInput && lastFileInput.parentNode))
+
+lastFileInput.files = [{
+  __text: JSON.stringify({
+    version: 1,
+    prompts: [{ id: 'imp3', title: '选文件导入', content: '选文件进来的正文', tags: ['导入'] }],
+  }),
+}]
+lastFileInput.onchange()
+node = draw()
+check('选文件导入后有提示', texts(node).indexOf('已导入 1 条') >= 0, texts(node).slice(0, 140))
+const stored2 = JSON.parse(storage.get('dsh:prompt-library:v1'))
+check('选文件导入真正写进 localStorage', stored2.prompts.some((p) => p.id === 'imp3'), JSON.stringify(stored2.prompts.map((p) => p.id)))
+check('选文件后 input 已从 DOM 摘除', bodyChildren.length === 0, 'left=' + bodyChildren.length)
+check('导入后弹窗自动关闭', find(node, (n) => n.props && n.props.className === 'pcl-dialog').length === 0)
+
+/* ---- 导入：坏数据不能静默吞掉 ---- */
+byText(node, '导入').props.onClick()
+node = draw()
+const area2 = find(node, (n) => n.tag === 'textarea')[0]
+area2.props.onChange({ target: { value: '这不是 JSON' } })
+node = draw()
+inDialog(node, '导入').props.onClick()
+node = draw()
+check('非法 JSON 有明确提示', texts(node).indexOf('不是合法的 JSON') >= 0, texts(node).slice(0, 140))
+check('非法 JSON 不写入数据', JSON.parse(storage.get('dsh:prompt-library:v1')).prompts.length === stored2.prompts.length)
+inDialog(node, '取消').props.onClick()
+node = draw()
 
 console.log('')
 let fails = 0
