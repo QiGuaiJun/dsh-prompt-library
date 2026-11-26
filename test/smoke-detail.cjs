@@ -250,6 +250,31 @@ const after = JSON.parse(storage.get('dsh:prompt-library:v1'))
 check('新建后共 3 条', after.prompts.length === 3, 'got ' + after.prompts.length)
 check('新建的标题正确', after.prompts.some((p) => p.title === '新建标题'), JSON.stringify(after.prompts.map((p) => p.title)))
 
+/* ---- 刷新按钮：外部改动 localStorage 后点「刷新」应重新读取 ---- */
+const ext = JSON.parse(storage.get('dsh:prompt-library:v1'))
+ext.prompts.push({
+  id: 'p9', title: '外部写入的卡片', content: '外部写入的正文', tags: ['外部'], note: '', source: '手动新建',
+  starred: false, pinned: false, createdAt: '2026-11-21T00:00:00.000Z', updatedAt: '2026-11-21T00:00:00.000Z',
+})
+storage.set('dsh:prompt-library:v1', JSON.stringify(ext))
+node = draw()
+check('未点刷新时界面仍是旧数据', find(node, (n) => n.props && n.props.className === 'pcl-card').length === 3,
+  'got ' + find(node, (n) => n.props && n.props.className === 'pcl-card').length)
+byText(node, '刷新').props.onClick()
+node = draw()
+check('点刷新后读到 4 张卡片', find(node, (n) => n.props && n.props.className === 'pcl-card').length === 4,
+  'got ' + find(node, (n) => n.props && n.props.className === 'pcl-card').length)
+check('刷新后新卡片可见', texts(node).indexOf('外部写入的卡片') >= 0)
+check('刷新后有提示', texts(node).indexOf('已刷新') >= 0)
+/* 复原：移除外部条目再刷新 */
+const back = JSON.parse(storage.get('dsh:prompt-library:v1'))
+back.prompts = back.prompts.filter((p) => p.id !== 'p9')
+storage.set('dsh:prompt-library:v1', JSON.stringify(back))
+byText(node, '刷新').props.onClick()
+node = draw()
+check('复原后回到 3 张', find(node, (n) => n.props && n.props.className === 'pcl-card').length === 3,
+  'got ' + find(node, (n) => n.props && n.props.className === 'pcl-card').length)
+
 /* ---- 标签筛选（先把搜索框清空，避免上一步残留） ---- */
 const searchBox = find(node, (n) => n.props && n.props.className === 'pcl-search')[0]
 searchBox.props.onChange({ target: { value: '' } })

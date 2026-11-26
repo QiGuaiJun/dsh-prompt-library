@@ -48,7 +48,7 @@
 | # | 项 | 说明 |
 |---|---|---|
 | 15 | 入口文案 | 「☆ 提示词卡」，位于「完全权限」右侧、模型选择左侧 |
-| 16 | 列表页布局 | 标题行（提示词卡 + 导入/导出/新建 + ×）→ 搜索框 + 「按标签筛选」下拉 → 标签 chips → 卡片列表 |
+| 16 | 列表页布局 | 标题行（提示词卡 + 刷新/导入/导出/新建 + ×）→ 搜索框 + 「按标签筛选」下拉 → 标签 chips → 卡片列表 |
 | 17 | 卡片内容 | 标题（不带标签 chips 到标题行）、正文 3 行截断、标签 chips |
 | 18 | 详情页 | 顶部「‹ 返回　提示词卡　×」；标题行右侧一排操作：复制 / 填入对话 / 编辑 / 置顶 / 删除 |
 | 19 | 详情页字段 | 标题 + 标签 chips + 「正文」小节 + 「来源」小节 |
@@ -296,6 +296,7 @@ node.data.finalNode.messageId
 | 置顶 | 切换 `pinned`；列表排序**置顶优先**，其余按 `updatedAt` 倒序 |
 | 删除 | `window.confirm` 二次确认 |
 | 导出 | 生成 `prompt-library.json` 触发下载 |
+| 刷新 | 重新执行 `loadState()` 覆盖组件状态，toast「已刷新」；用于别的标签页改动后同步 |
 | 导入 | 读文件 → `safeParse` → 以 `id` 为键合并，同 id 覆盖 → 刷新列表 |
 
 ---
@@ -347,11 +348,13 @@ node test/smoke-theme-poll.cjs  # 明暗跟随（服务晚就绪）
 
 | 脚本 | 覆盖 | 结果 |
 |---|---|---|
-| `test/smoke-client.cjs` | 槽位注册契约 + 列表页渲染（搜索框/下拉/chips/卡片/图钉） | 27 项通过 |
-| `test/smoke-detail.cjs` | 详情页 + 复制 + 填入对话 + 编辑保存 + 新建 + 标签筛选 + 搜索 | 29 项通过 |
+| `test/smoke-client.cjs` | 槽位注册契约 + 列表页渲染（搜索框/下拉/chips/卡片/图钉/刷新按钮） | 28 项通过 |
+| `test/smoke-detail.cjs` | 详情页 + 复制 + 填入对话 + 编辑保存 + 新建 + 刷新 + 标签筛选 + 搜索 | 34 项通过 |
 | `test/smoke-asst.cjs` | 助手消息正文提取（text 块拼接、跳过 reasoning、异常降级） | 7 项通过 |
 | `test/smoke-theme.cjs` | `theme` 服务已就绪时：订阅 `theme/change`、亮/暗切换驱动 `pcl-light`、服务缺失/抛异常都不崩 | 9 项通过 |
 | `test/smoke-theme-poll.cjs` | `theme` **晚就绪**：先轮询、就绪后接上并停轮询、永不就绪时 8s 后放弃且槽位仍全注册 | 12 项通过 |
+
+合计 **90 项，失败 0**。
 
 **在线槽位核实**（`cordis_inspect_query` 读运行中 GUI 的真实槽位树，全部 `active: true`）
 
@@ -372,16 +375,17 @@ node test/smoke-theme-poll.cjs  # 明暗跟随（服务晚就绪）
 | `conversation.chat.user.before` | `{ name, select(owner) }`（chain 槽，无 id） |
 | `conversation.chat.assistant-actions` | `{ name, id:'dsh-prompt-library-save-assistant', order:20 }` |
 
-**列表页 27 项**（`test/smoke-client.cjs`）：模块注册、`inject` 含 `slots`、5 个槽位注册契约逐条比对
+**列表页 28 项**（`test/smoke-client.cjs`）：模块注册、`inject` 含 `slots`、5 个槽位注册契约逐条比对
 （`conversation.input.left` 带 `id+order`、`shell.overlay` 带 `id+order`、`input.right` 带 `id`、
 `user.before` 只有 `select` 且**不带 id**、`assistant-actions` 带 `id+order`）、
 chain `select` 命中返 `{text}` / 空文本返 `null`、面板默认关闭不渲染、
-点入口按钮后渲染出标题/搜索框/下拉/新建/chips/卡片、置顶条目带 📌 且排最前。
+点入口按钮后渲染出标题/搜索框/下拉/新建/刷新/chips/卡片、置顶条目带 📌 且排最前。
 
-**详情页 29 项**（`test/smoke-detail.cjs`）：进入详情页显示标题与 6 个操作按钮、
+**详情页 34 项**（`test/smoke-detail.cjs`）：进入详情页显示标题与 6 个操作按钮、
 「复制」写入剪贴板、「填入对话」调用 `setDraft` 且面板自动关闭、
 「编辑」改正文后正确落库且保留 `pinned`、「返回」回到列表、
 「新建」填标题+正文后落库且标题正确、
+外部改 `localStorage` 后未点「刷新」仍显示旧数据、点「刷新」后读到新条目并 toast「已刷新」、
 标签下拉与 chips 行为一致（都只剩 1 张）、搜索命中标题。
 
 **助手正文提取 7 项**（`test/smoke-asst.cjs`）：按 `messageId` 命中目标消息、

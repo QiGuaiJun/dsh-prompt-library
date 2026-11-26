@@ -221,6 +221,7 @@ check('标题：提示词卡', body.indexOf('提示词卡') >= 0, body.slice(0, 
 check('有搜索框 placeholder', find(node, (n) => n.props && n.props.className === 'pcl-search').length === 1)
 check('有按标签筛选下拉', find(node, (n) => n.props && n.props.className === 'pcl-select').length === 1)
 check('有「新建」按钮', body.indexOf('新建') >= 0)
+check('有「刷新」按钮', body.indexOf('刷新') >= 0)
 check('有标签 chips：全部', body.indexOf('全部') >= 0)
 check('渲染出 2 张卡片', find(node, (n) => n.props && n.props.className === 'pcl-card').length === 2,
   'got ' + find(node, (n) => n.props && n.props.className === 'pcl-card').length)
